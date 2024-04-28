@@ -1,0 +1,4 @@
+osmnx==1.9.2
+scikit-learn==1.4.2
+haversine==2.8.1
+boto3==1.34.93
