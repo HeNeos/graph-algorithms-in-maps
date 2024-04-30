@@ -34,6 +34,7 @@ struct Response {
     solution_key: String,
     source: NodeId,
     destination: NodeId,
+    graph_id: String
 }
 
 #[derive(Clone)]
@@ -309,6 +310,7 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
         solution_key: file_key,
         source: source,
         destination: destination,
+        graph_id: key
     };
 
     Ok(resp)
