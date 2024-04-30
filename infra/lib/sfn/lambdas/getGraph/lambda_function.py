@@ -2,47 +2,27 @@ import os
 import json
 import boto3
 import requests
-import io
 
 from dataclasses import dataclass
 from uuid import uuid4
 import osmnx as ox
 from networkx import MultiDiGraph
-
 from typing import Tuple, Optional, Dict, List
+
+from modules.graph import NodeId, EdgeId, Node, Edge, Graph
 
 @dataclass
 class Coordinates:
   latitude: float
   longitude: float
 
-NodeId = int
-EdgeId = Tuple[NodeId, NodeId]
-
-@dataclass
-class Node:
-  id: NodeId
-  next_nodes: List[NodeId]
-
-@dataclass
-class Edge:
-  id: EdgeId
-  length: float
-  maxspeed: int
-
-@dataclass
-class Graph:
-  nodes: Dict[NodeId, Node]
-  edges: Dict[EdgeId, Edge]
-
-
 GRAPHS_TABLE_NAME = os.environ["GRAPHS_TABLE_NAME"]
 GRAPHS_BUCKET_NAME = os.environ["GRAPHS_BUCKET"]
 
 dynamodb = boto3.resource("dynamodb")
-table = dynamodb.Table(GRAPHS_TABLE_NAME)
+graphs_table = dynamodb.Table(GRAPHS_TABLE_NAME)
 s3 = boto3.resource("s3")
-bucket = s3.Bucket(GRAPHS_BUCKET_NAME)
+graphs_bucket = s3.Bucket(GRAPHS_BUCKET_NAME)
 
 def get_current_location(coordinates: Coordinates) -> Tuple[Optional[str], Optional[str]]:
   latitude, longitude = (round(coordinates.latitude, 6), round(coordinates.longitude, 6))
@@ -87,35 +67,29 @@ def store_graph(graph: Graph, key: str):
   nodes = {"Nodes": [str(node) for node in set(graph.nodes.keys())]}
   edges = {
     "Edges": {
-      ','.join(str(x) for x in edge_id): ','.join([str(edge.length), str(edge.maxspeed)]) 
+      ','.join(str(x) for x in edge_id): ','.join([str(edge.length), str(edge.maxspeed)])
       for edge_id, edge in graph.edges.items()
     }
   }
-  # nodes_data = io.BytesIO(nodes)
-  # edges_data = io.BytesIO(edges)
-  bucket.put_object(Key=f"nodes-{key}.json", Body=json.dumps(nodes))
-  bucket.put_object(Key=f"edges-{key}.json", Body=json.dumps(edges))
-  # s3.upload_file_obj(nodes_data, GRAPHS_BUCKET_NAME, f"nodes-{key}.json")
-  # s3.upload_file_obj(edges_data, GRAPHS_BUCKET_NAME, f"edges-{key}.json")
+  graphs_bucket.put_object(Key=f"nodes-{key}.json", Body=json.dumps(nodes))
+  graphs_bucket.put_object(Key=f"edges-{key}.json", Body=json.dumps(edges))
 
 def download_graph(country: str, city: str) -> Tuple[MultiDiGraph, str]:
   ox.config(use_cache=True, cache_folder="/tmp/osmnx_cache")
-  ox.settings.cache_folder
+  # ox.settings.cache_folder
   G: MultiDiGraph = ox.graph_from_place(f"{city}, {country}", network_type="drive")
   key: str = uuid4().hex
   #TODO: Send it directly to S3
   ox.save_graphml(G, f"/tmp/{key}.graphml")
-  # with open(f"{key}.graphml", "rb") as data:
-  #   bucket.upload_fileobj(data, f"{key}.graphml")
-  bucket.upload_file(f"/tmp/{key}.graphml", f"{key}.graphml")
+  graphs_bucket.upload_file(f"/tmp/{key}.graphml", f"{key}.graphml")
   return G, key
 
 def get_multidigraph(graph_id: str) -> MultiDiGraph:
-  bucket.download_file(Key=f"{graph_id}.graphml", Filename=f"/tmp/{graph_id}.graphml")
+  graphs_bucket.download_file(Key=f"{graph_id}.graphml", Filename=f"/tmp/{graph_id}.graphml")
   return ox.load_graphml(f"/tmp/{graph_id}.graphml")
 
 def get_graph(country: str, city: str) -> Tuple[MultiDiGraph, str]:
-  response = table.get_item(
+  response = graphs_table.get_item(
     Key={
       "Country": country,
       "City": city
@@ -123,12 +97,12 @@ def get_graph(country: str, city: str) -> Tuple[MultiDiGraph, str]:
   )
 
   item: Dict[str, Dict[str, str]] = response.get("Item", {})
-  graph_id: Optional[str] = item.get("GraphId", None)
+  graph_id: Optional[str] = item.get("GraphId", None) # type: ignore
   if graph_id is None:
     G, graph_id = download_graph(country, city)
     graph: Graph = generate_graph(G)
     store_graph(graph, graph_id)
-    table.put_item(Item={
+    graphs_table.put_item(Item={
       "Country": country,
       "City": city,
       "GraphId": graph_id
@@ -138,8 +112,8 @@ def get_graph(country: str, city: str) -> Tuple[MultiDiGraph, str]:
 
   return G, graph_id
 
-def get_node_id(G: MultiDiGraph, location: Coordinates) -> NodeId:
-  return ox.nearest_nodes(G, location.longitude, location.latitude)
+def get_node_id(graph: MultiDiGraph, location: Coordinates) -> NodeId:
+  return ox.nearest_nodes(graph, location.longitude, location.latitude) # type: ignore
 
 def lambda_handler(event, _):
   source_coordinates = event["source"]
@@ -156,12 +130,12 @@ def lambda_handler(event, _):
   if not all([source_city, source_country, destination_city, destination_country]):
     print("No possible to find a valid location")
     return
-  
+
   if source_city != destination_city or source_country != destination_country:
     print("Source and destination are not in the same city/country")
     return
-  
-  G, graph_id = get_graph(source_country, source_city)
+
+  G, graph_id = get_graph(source_country, source_city) # type: ignore
   source = get_node_id(G, source_coordinates)
   destination = get_node_id(G, destination_coordinates)
 
