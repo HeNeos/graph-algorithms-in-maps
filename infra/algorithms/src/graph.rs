@@ -1,7 +1,8 @@
 use std::collections::HashMap;
+use std::cmp::Ordering;
 
-type NodeId = i64;
-type EdgeId = (NodeId, NodeId);
+pub type NodeId = i64;
+pub type EdgeId = (NodeId, NodeId);
 
 #[derive(Clone)]
 pub struct Node {
@@ -19,4 +20,34 @@ pub struct Edge {
 pub struct Graph {
   pub nodes: HashMap<NodeId, Node>,
   pub edges: HashMap<EdgeId, Edge>,
+}
+
+#[derive(Copy, Clone)]
+pub struct State {
+  pub weight: f64,
+  pub node_id: NodeId,
+}
+
+impl Eq for State {}
+
+impl PartialEq for State {
+  fn eq(&self, other: &Self) -> bool {
+    self.weight == other.weight && self.node_id == other.node_id
+  }
+}
+
+impl Ord for State {
+  fn cmp(&self, other: &Self) -> Ordering {
+    other
+      .weight
+      .partial_cmp(&self.weight)
+      .unwrap_or(Ordering::Equal)
+      .then_with(|| other.node_id.cmp(&self.node_id))
+  }
+}
+
+impl PartialOrd for State {
+  fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+    Some(self.cmp(other))
+  }
 }
