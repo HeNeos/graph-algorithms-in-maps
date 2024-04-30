@@ -90,7 +90,7 @@ async fn get_graph(
     bucket: &String,
     key: &String,
 ) -> Result<(NodesJson, EdgesJson), anyhow::Error> {
-    let nodes_object = client
+    let nodes_object: GetObjectOutput = client
         .get_object()
         .bucket(bucket)
         .key(format!("nodes-{}.json", key))
@@ -98,7 +98,7 @@ async fn get_graph(
         .send()
         .await?;
 
-    let edges_object = client
+    let edges_object: GetObjectOutput = client
         .get_object()
         .bucket(bucket)
         .key(format!("edges-{}.json", key))
@@ -122,7 +122,7 @@ async fn upload_path(
     key: &str,
     graph_path: &HashMap<NodeId, NodeId>,
 ) -> Result<PutObjectOutput, SdkError<PutObjectError>> {
-    let path_json = serde_json::to_string(&graph_path).expect("Failed to serialize the path");
+    let path_json: String = serde_json::to_string(&graph_path).expect("Failed to serialize the path");
     client
         .put_object()
         .bucket(bucket)
@@ -241,17 +241,12 @@ async fn dijkstra(
     return None;
 }
 
-/// This is the main body for the function.
-/// Write your code inside it.
-/// There are some code example in the following URLs:
-/// - https://github.com/awslabs/aws-lambda-rust-runtime/tree/main/examples
-/// - https://github.com/aws-samples/serverless-rust-demo/
 async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error> {
     let region_provider = RegionProviderChain::default_provider().or_else("us-east-1");
     let config = aws_config::from_env().region(region_provider).load().await;
     let client: Client = Client::new(&config);
 
-    let bucket = match env::var("GRAPHS_BUCKET") {
+    let bucket: String = match env::var("GRAPHS_BUCKET") {
         Ok(b) => b,
         Err(_) => {
             eprintln!("Failed to read 'GRAPHS_BUCKET' env var");
@@ -259,7 +254,7 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
         }
     };
 
-    let solution_bucket = match env::var("PATHS_BUCKET") {
+    let solution_bucket: String = match env::var("PATHS_BUCKET") {
         Ok(b) => b,
         Err(_) => {
             eprintln!("Failed to read 'PATHS_BUCKET' env var");
@@ -267,7 +262,7 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
         }
     };
 
-    let key = &event.payload.key;
+    let key: &String = &event.payload.key;
     let source: NodeId = event.payload.source;
     let destination: NodeId = event.payload.destination;
 
@@ -296,21 +291,21 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
         }
     };
 
-    let current_time = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
-    let unique_id = Uuid::new_v4().hyphenated().to_string();
-    let file_key = format!("{}_{}.json", current_time, unique_id);
+    let current_time: String = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+    let unique_id: String = Uuid::new_v4().hyphenated().to_string();
+    let file_key: String = format!("{}_{}.json", current_time, unique_id);
 
     let resp = upload_path(&client, &solution_bucket, &file_key, &path).await;
 
     assert!(resp.is_ok(), "{resp:?}");
 
-    let resp = Response {
+    let resp: Response = Response {
         iterations,
         weight,
         solution_key: file_key,
         source: source,
         destination: destination,
-        graph_id: key
+        graph_id: event.payload.key
     };
 
     Ok(resp)
