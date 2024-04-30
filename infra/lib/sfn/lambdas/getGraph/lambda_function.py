@@ -88,7 +88,7 @@ def get_multidigraph(graph_id: str) -> MultiDiGraph:
   graphs_bucket.download_file(Key=f"{graph_id}.graphml", Filename=f"/tmp/{graph_id}.graphml")
   return ox.load_graphml(f"/tmp/{graph_id}.graphml")
 
-def get_graph(country: str, city: str) -> Tuple[MultiDiGraph, str]:
+def get_graph_id(country: str, city: str) -> Optional[str]:
   response = graphs_table.get_item(
     Key={
       "Country": country,
@@ -98,6 +98,10 @@ def get_graph(country: str, city: str) -> Tuple[MultiDiGraph, str]:
 
   item: Dict[str, Dict[str, str]] = response.get("Item", {})
   graph_id: Optional[str] = item.get("GraphId", None) # type: ignore
+  return graph_id
+
+def get_graph(country: str, city: str) -> Tuple[MultiDiGraph, str]:
+  graph_id = get_graph_id(country, city)
   if graph_id is None:
     G, graph_id = download_graph(country, city)
     graph: Graph = generate_graph(G)

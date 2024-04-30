@@ -67,18 +67,6 @@ def get_graph_data(graph_id: str):
 
   return graph_nodes, graph_edges
 
-def get_graph_id(country: str, city: str) -> Optional[str]:
-  response = graphs_table.get_item(
-    Key={
-      "Country": country,
-      "City": city
-    }
-  )
-
-  item: Dict[str, Dict[str, str]] = response.get("Item", {})
-  graph_id: Optional[str] = item.get("GraphId", None) # type: ignore
-  return graph_id
-
 def save_graph(graph: MultiDiGraph, edges_in_path: List[EdgeId], solution_key: str):
   destination = edges_in_path[0][-1]
   source = edges_in_path[-1][0]
