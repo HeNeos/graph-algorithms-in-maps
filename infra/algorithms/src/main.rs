@@ -1,10 +1,14 @@
+extern crate queues;
+
 mod graph;
 mod utils;
 mod dijkstra;
+mod bfs;
 
 use graph::{NodeId, Graph};
 use utils::{get_graph, upload_path, parse_graph};
 use dijkstra::dijkstra;
+use bfs::bfs;
 
 use std::env;
 use std::process::exit;

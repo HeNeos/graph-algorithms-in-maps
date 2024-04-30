@@ -39,15 +39,15 @@ pub async fn dijkstra(
         .copied()
         .unwrap_or(INFINITY)
         > new_weight
-        {
-          weight_from_source.insert(*next_node_id, new_weight);
-          previous_node.insert(*next_node_id, node_id);
-          priority_queue.push(State {
-            weight: new_weight,
-            node_id: *next_node_id,
-          });
-        }
+      {
+        weight_from_source.insert(*next_node_id, new_weight);
+        previous_node.insert(*next_node_id, node_id);
+        priority_queue.push(State {
+          weight: new_weight,
+          node_id: *next_node_id,
+        });
       }
+    }
   }
   return None;
 }
