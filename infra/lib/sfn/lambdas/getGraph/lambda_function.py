@@ -7,7 +7,8 @@ from dataclasses import dataclass
 from uuid import uuid4
 import osmnx as ox
 from networkx import MultiDiGraph
-from typing import Tuple, Optional, Dict, List
+from networkx import Graph as NGraph
+from typing import Tuple, Optional, Dict, List, Union
 
 from modules.graph import NodeId, EdgeId, Node, Edge, Graph
 
@@ -116,8 +117,34 @@ def get_graph(country: str, city: str) -> Tuple[MultiDiGraph, str]:
 
   return G, graph_id
 
-def get_node_id(graph: MultiDiGraph, location: Coordinates) -> NodeId:
+def get_node_id(graph: Union[MultiDiGraph, NGraph], location: Coordinates) -> NodeId:
   return ox.nearest_nodes(graph, location.longitude, location.latitude) # type: ignore
+
+def get_ids(country: str, city: str, source_coordinates: Coordinates, destination_coordinates: Coordinates) -> Tuple[str, NodeId, NodeId]:
+  graph_id = get_graph_id(country, city)
+  if graph_id is None:
+    G, graph_id = download_graph(country, city)
+    graph: Graph = generate_graph(G)
+    store_graph(graph, graph_id)
+    graphs_table.put_item(Item={
+      "Country": country,
+      "City": city,
+      "GraphId": graph_id
+    })
+    source = get_node_id(G, source_coordinates)
+    destination = get_node_id(G, destination_coordinates)
+    return graph_id, source, destination
+  else:
+    try:
+      source_graph = ox.graph_from_point((source_coordinates.latitude, source_coordinates.longitude), dist=200, network_type="drive")
+      destination_graph = ox.graph_from_point((destination_coordinates.latitude, destination_coordinates.longitude), dist=200, network_type="drive")
+    except ValueError as err:
+      print("Not found a valid node around source or destination in 200m around.\n")
+      print(err)
+      raise
+    source = get_node_id(source_graph, source_coordinates)
+    destination = get_node_id(destination_graph, destination_coordinates)
+    return graph_id, source, destination
 
 def lambda_handler(event, _):
   source_coordinates = event["source"]
@@ -139,9 +166,10 @@ def lambda_handler(event, _):
     print("Source and destination are not in the same city/country")
     return
 
-  G, graph_id = get_graph(source_country, source_city) # type: ignore
-  source = get_node_id(G, source_coordinates)
-  destination = get_node_id(G, destination_coordinates)
+  # G, graph_id = get_graph(source_country, source_city) # type: ignore
+  # source = get_node_id(G, source_coordinates)
+  # destination = get_node_id(G, destination_coordinates)
+  graph_id, source, destination = get_ids(source_country, source_city, source_coordinates, destination_coordinates) #type: ignore
 
   return {
     "source": source,
