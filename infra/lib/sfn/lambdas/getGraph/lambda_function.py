@@ -164,9 +164,6 @@ def lambda_handler(event, _):
     print("Source and destination are not in the same city/country")
     return
 
-  # G, graph_id = get_graph(source_country, source_city) # type: ignore
-  # source = get_node_id(G, source_coordinates)
-  # destination = get_node_id(G, destination_coordinates)
   ox.config(use_cache=True, cache_folder="/tmp/osmnx_cache")
   graph_id, source, destination = get_ids(source_country, source_city, source_coordinates, destination_coordinates) #type: ignore
 
