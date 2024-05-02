@@ -67,7 +67,7 @@ def get_graph_data(graph_id: str):
 
   return graph_nodes, graph_edges
 
-def save_graph(graph: MultiDiGraph, edges_in_path: List[EdgeId], solution_key: str):
+def save_graph(graph: MultiDiGraph, edges_in_path: List[EdgeId], solution_key: str, dist, time):
   destination = edges_in_path[0][-1]
   source = edges_in_path[-1][0]
   node_size = []
@@ -98,7 +98,7 @@ def save_graph(graph: MultiDiGraph, edges_in_path: List[EdgeId], solution_key: s
       edge_alpha.append(UnvisitedEdge.alpha)
       edge_linewidth.append(UnvisitedEdge.linewidth)
 
-  ox.plot_graph(
+  fig, ax = ox.plot_graph(
     graph,
     node_size=node_size,
     node_alpha=node_alpha,
@@ -108,10 +108,11 @@ def save_graph(graph: MultiDiGraph, edges_in_path: List[EdgeId], solution_key: s
     node_color=node_color,
     bgcolor="#000000",
     show=False,
-    save=True,
-    dpi=600,
-    filepath=f"/tmp/{solution_key}.png"
+    close=False
   )
+  title = '\n'.join([f"Distance: {dist} km", f"Time: {time}"])
+  ax.set_title(title, color="white")
+  plt.savefig(f"/tmp/{solution_key}.png", dpi=600)
   plt.close()
   paths_bucket.upload_file(f"/tmp/{solution_key}.png", f"{solution_key}.png")
 
@@ -133,10 +134,11 @@ def reconstruct_path(G: MultiDiGraph, nodes: List[NodeId], edges: Dict[EdgeId, E
     time += (current_length / 1000) / current_maxspeed
     current_node_id = previous_node_id
   time_in_sec = int(time * 60 * 60)
+  formatted_time = f"{time_in_sec // 60} min {time_in_sec%60} sec"
   print(f"Total dist = {dist} km")
-  print(f"Total time = {time_in_sec // 60} min {time_in_sec%60} sec")
+  print(f"Total time = {formatted_time}")
   print(f"Speed average = {dist / time}")
-  save_graph(G, edges_in_path, solution_key)
+  save_graph(G, edges_in_path, solution_key, dist, formatted_time)
 
 def lambda_handler(event: Event, _):
   event_graph = Event(
