@@ -27,8 +27,14 @@ export class SfnStack extends cdk.Stack {
     if (!graphsBucket || !graphsPlotsBucket) throw new Error("Missing bucket props");
     if (!graphsDatabase) throw new Error("Missing database prop");
 
-    const getGraphsImage = lambda.DockerImageCode.fromImageAsset(path.join(__dirname, "./lambdas/getGraph"));
-    const plotPathImage = lambda.DockerImageCode.fromImageAsset(path.join(__dirname, "./lambdas/plotPath"));
+    const getGraphsImage = lambda.DockerImageCode.fromImageAsset(__dirname, {
+      buildArgs: {FUNCTION_NAME: "getGraph"},
+      cmd: ["lambdas.getGraph.lambda_function.lambda_handler"]
+    });
+    const plotPathImage = lambda.DockerImageCode.fromImageAsset(__dirname, {
+      buildArgs: {FUNCTION_NAME: "plotPath"}, 
+      cmd: ["lambdas.plotPath.lambda_function.lambda_handler"]
+    });
 
     const getGraphLambda = new lambda.DockerImageFunction(this, "getGraphLambda", {
       functionName: "getGraph",
@@ -38,9 +44,9 @@ export class SfnStack extends cdk.Stack {
         PATHS_BUCKET: graphsPlotsBucket.bucketName,
         GRAPHS_TABLE_NAME: graphsDatabase.tableName
       },
-      timeout: cdk.Duration.minutes(4),
+      timeout: cdk.Duration.minutes(2),
       memorySize: 2048,
-      ephemeralStorageSize: cdk.Size.mebibytes(2048)
+      ephemeralStorageSize: cdk.Size.mebibytes(1024)
     });
 
     graphsDatabase.grantReadWriteData(getGraphLambda);
@@ -53,7 +59,9 @@ export class SfnStack extends cdk.Stack {
         PATHS_BUCKET: graphsPlotsBucket.bucketName,
         GRAPHS_TABLE_NAME: graphsDatabase.tableName
       },
-      timeout: cdk.Duration.minutes(4)
+      timeout: cdk.Duration.minutes(2),
+      memorySize: 2048,
+      ephemeralStorageSize: cdk.Size.mebibytes(1024)
     });
 
     graphsDatabase.grantReadData(plotPathLambda);

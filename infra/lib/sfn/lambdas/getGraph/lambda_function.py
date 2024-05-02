@@ -76,8 +76,6 @@ def store_graph(graph: Graph, key: str):
   graphs_bucket.put_object(Key=f"edges-{key}.json", Body=json.dumps(edges))
 
 def download_graph(country: str, city: str) -> Tuple[MultiDiGraph, str]:
-  ox.config(use_cache=True, cache_folder="/tmp/osmnx_cache")
-  # ox.settings.cache_folder
   G: MultiDiGraph = ox.graph_from_place(f"{city}, {country}", network_type="drive")
   key: str = uuid4().hex
   #TODO: Send it directly to S3
@@ -169,6 +167,7 @@ def lambda_handler(event, _):
   # G, graph_id = get_graph(source_country, source_city) # type: ignore
   # source = get_node_id(G, source_coordinates)
   # destination = get_node_id(G, destination_coordinates)
+  ox.config(use_cache=True, cache_folder="/tmp/osmnx_cache")
   graph_id, source, destination = get_ids(source_country, source_city, source_coordinates, destination_coordinates) #type: ignore
 
   return {

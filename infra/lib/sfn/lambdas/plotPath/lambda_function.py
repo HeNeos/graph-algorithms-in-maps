@@ -38,11 +38,11 @@ def get_multidigraph(graph_id: str) -> MultiDiGraph:
 
 def get_path(solution_key: str):
   path_object = s3_client.get_object(
-    Bucket=GRAPHS_BUCKET_NAME,
-    Key=f"{solution_key}.json"
+    Bucket=PATHS_BUCKET_NAME,
+    Key=solution_key
   )
   path = json.load(path_object["Body"])
-  return path
+  return {int(k): v for k, v in path.items()}
 
 def get_graph_data(graph_id: str):
   [nodes, edges] = [
@@ -109,7 +109,7 @@ def save_graph(graph: MultiDiGraph, edges_in_path: List[EdgeId], solution_key: s
     bgcolor="#000000",
     show=False,
     save=True,
-    dpi=1024,
+    dpi=600,
     filepath=f"/tmp/{solution_key}.png"
   )
   plt.close()
@@ -139,8 +139,16 @@ def reconstruct_path(G: MultiDiGraph, nodes: List[NodeId], edges: Dict[EdgeId, E
   save_graph(G, edges_in_path, solution_key)
 
 def lambda_handler(event: Event, _):
-  G: MultiDiGraph = get_multidigraph(event.graph_id)
-  path = get_path(event.solution_key)
-  nodes, edges = get_graph_data(event.graph_id)
+  event_graph = Event(
+    iterations=event["iterations"],
+    weight=event["weight"],
+    solution_key=event["solution_key"],
+    source=event["source"],
+    destination=event["destination"],
+    graph_id=event["graph_id"]
+  )
+  G: MultiDiGraph = get_multidigraph(event_graph.graph_id)
+  path = get_path(event_graph.solution_key)
+  nodes, edges = get_graph_data(event_graph.graph_id)
 
-  reconstruct_path(G, nodes, edges, event.source, event.destination, path, event.solution_key)
+  reconstruct_path(G, nodes, edges, event_graph.source, event_graph.destination, path, event_graph.solution_key)
