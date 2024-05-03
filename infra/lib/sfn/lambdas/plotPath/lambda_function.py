@@ -4,6 +4,7 @@ import osmnx as ox
 import boto3
 import json
 import matplotlib.pyplot as plt
+import requests
 
 from dataclasses import dataclass
 from networkx import MultiDiGraph
@@ -67,7 +68,7 @@ def get_graph_data(graph_id: str):
 
   return graph_nodes, graph_edges
 
-def save_graph(graph: MultiDiGraph, edges_in_path: List[EdgeId], solution_key: str, dist, time):
+def save_graph(graph: MultiDiGraph, edges_in_path: List[EdgeId], solution_key: str, dist, time) -> Optional[str]:
   destination = edges_in_path[0][-1]
   source = edges_in_path[-1][0]
   node_size = []
@@ -116,7 +117,13 @@ def save_graph(graph: MultiDiGraph, edges_in_path: List[EdgeId], solution_key: s
   plt.close()
   paths_bucket.upload_file(f"/tmp/{solution_key}.png", f"{solution_key}.png")
 
-def reconstruct_path(G: MultiDiGraph, nodes: List[NodeId], edges: Dict[EdgeId, Edge], source: NodeId, destination: NodeId, path: Dict[NodeId, Optional[NodeId]], solution_key: str):
+  response = s3_client.generate_presigned_url("get_object", Params={
+    "Bucket": PATHS_BUCKET_NAME,
+    "Key": f"{solution_key}.png"
+  }, ExpiresIn=300)
+  return str(response)
+
+def reconstruct_path(G: MultiDiGraph, nodes: List[NodeId], edges: Dict[EdgeId, Edge], source: NodeId, destination: NodeId, path: Dict[NodeId, Optional[NodeId]], solution_key: str) -> str:
   dist: float = 0
   time: float = 0
   edges_in_path: List[EdgeId] = []
@@ -138,7 +145,8 @@ def reconstruct_path(G: MultiDiGraph, nodes: List[NodeId], edges: Dict[EdgeId, E
   print(f"Total dist = {dist} km")
   print(f"Total time = {formatted_time}")
   print(f"Speed average = {dist / time}")
-  save_graph(G, edges_in_path, solution_key, dist, formatted_time)
+  s3_url = save_graph(G, edges_in_path, solution_key, dist, formatted_time)
+  return s3_url
 
 def lambda_handler(event: Event, _):
   event_graph = Event(
@@ -153,4 +161,9 @@ def lambda_handler(event: Event, _):
   path = get_path(event_graph.solution_key)
   nodes, edges = get_graph_data(event_graph.graph_id)
 
-  reconstruct_path(G, nodes, edges, event_graph.source, event_graph.destination, path, event_graph.solution_key)
+  s3_url = reconstruct_path(G, nodes, edges, event_graph.source, event_graph.destination, path, event_graph.solution_key)
+
+  return {
+    "statusCode": 200,
+    "body": json.dumps({"url": s3_url})
+  }

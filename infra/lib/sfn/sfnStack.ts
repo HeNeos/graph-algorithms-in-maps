@@ -76,8 +76,8 @@ export class SfnStack extends cdk.Stack {
         GRAPHS_BUCKET: graphsBucket.bucketName,
         PATHS_BUCKET: graphsPlotsBucket.bucketName
       },
-      timeout: cdk.Duration.seconds(20),
-      memorySize: 1024
+      timeout: cdk.Duration.seconds(15),
+      memorySize: 2048
     });
 
     for (const graphLambda of [getGraphLambda, plotPathLambda, algorithmsLambda]){

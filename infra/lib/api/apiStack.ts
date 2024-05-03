@@ -13,9 +13,13 @@ export class ApiStack extends cdk.Stack {
 
     if (!props) throw new Error("Missing props");
 
-    new apigw.StepFunctionsRestApi(this, "graphsRestApi", {
+    const graphsRestApi = new apigw.StepFunctionsRestApi(this, "graphsRestApi", {
       stateMachine: props.graphsStateMachine,
       deploy: true
     });
+    // graphsRestApi.root.addMethod("GET", apigw.StepFunctionsIntegration.startExecution(props.graphsStateMachine, {
+    //   timeout: cdk.Duration.minutes(1),
+    //   querystring: true
+    // }));
   }
 }

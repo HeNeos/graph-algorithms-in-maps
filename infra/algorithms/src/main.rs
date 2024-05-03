@@ -52,8 +52,6 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
             exit(1);
         }
     };
-    // let bucket = "s3stack-graphsbucketcd9f6fb9-0ict0mh3z3vf";
-    // let bucket = bucket.to_string();
 
     let solution_bucket: String = match env::var("PATHS_BUCKET") {
         Ok(b) => b,
@@ -62,8 +60,6 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
             exit(1);
         }
     };
-    // let solution_bucket = "s3stack-graphsplotsbucket25b32816-0mwjzyaajypa";
-    // let solution_bucket = solution_bucket.to_string();
 
     let key: &String = &event.payload.key;
     let source: NodeId = event.payload.source;
@@ -93,7 +89,6 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
         _ => dijkstra(&graph, source, destination).await,
     };
 
-    // let graph_result = dijkstra(&graph, source, destination).await;
     let (path, weight, iterations) = match graph_result {
         Some(x) => x,
         None => {

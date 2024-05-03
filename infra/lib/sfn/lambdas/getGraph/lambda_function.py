@@ -177,11 +177,14 @@ def get_ids(country: str, city: str, source_coordinates: Coordinates, destinatio
     return graph_id, source, destination
 
 def lambda_handler(event, _):
-  source_coordinates = event["source"]
-  destination_coordinates = event["destination"]
+  if "querystring" in event:
+    event = event.get("querystring", {})
   algorithm = event.get("algorithm", "dijkstra")
-  source_coordinates = Coordinates(latitude=source_coordinates["latitude"], longitude=source_coordinates["longitude"])
-  destination_coordinates = Coordinates(latitude=destination_coordinates["latitude"], longitude=destination_coordinates["longitude"])
+  for coordinate in ["source_lat", "source_lon", "dest_lat", "dest_lon"]:
+    event[coordinate] = float(event[coordinate])
+
+  source_coordinates = Coordinates(latitude=event["source_lat"], longitude=event["source_lon"])
+  destination_coordinates = Coordinates(latitude=event["dest_lat"], longitude=event["dest_lon"])
 
   source_location = get_current_location(source_coordinates)
   destination_location = get_current_location(destination_coordinates)
@@ -197,8 +200,8 @@ def lambda_handler(event, _):
   if source_city != destination_city or source_country != destination_country:
     print("Source and destination are not in the same city/country")
     use_distance = haversine(
-      (source_coordinates["longitude"], source_coordinates["latitude"]),
-      (destination_coordinates["longitude"], destination_coordinates["latitude"])
+      (event["source_lon"], event["source_lat"]),
+      (event["dest_lon"], event["dest_lat"])
     )
     print("Not possible to cache, downloading by distance")
 
@@ -211,5 +214,3 @@ def lambda_handler(event, _):
     "key": graph_id,
     "algorithm": algorithm
   }
-
-
