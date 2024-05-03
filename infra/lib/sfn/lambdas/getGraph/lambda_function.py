@@ -9,6 +9,7 @@ import osmnx as ox
 from networkx import MultiDiGraph
 from networkx import Graph as NGraph
 from typing import Tuple, Optional, Dict, List, Union
+from haversine import haversine
 
 from modules.graph import NodeId, EdgeId, Node, Edge, Graph
 
@@ -61,11 +62,19 @@ def generate_graph(graph: MultiDiGraph) -> Graph:
     if u not in to_node_by_node:
       to_node_by_node[u] = []
     to_node_by_node[u].append(v)
-  all_nodes: Dict[NodeId, Node] = {node: Node(id=node, next_nodes=to_node_by_node.get(node, [])) for node in graph.nodes}
+  all_nodes: Dict[NodeId, Node] = {
+    node: Node(id=node, next_nodes=to_node_by_node.get(node, []), lat=graph.nodes[node]["y"], lon=graph.nodes[node]["x"])
+    for node in graph.nodes
+  }
   return Graph(nodes=all_nodes, edges=all_edges)
 
 def store_graph(graph: Graph, key: str):
-  nodes = {"Nodes": [str(node) for node in set(graph.nodes.keys())]}
+  nodes = {
+    "Nodes": {
+      str(node): f"{node_data.lat},{node_data.lon}"
+      for node, node_data in graph.nodes.items()
+    }
+  }
   edges = {
     "Edges": {
       ','.join(str(x) for x in edge_id): ','.join([str(edge.length), str(edge.maxspeed)])
@@ -76,9 +85,22 @@ def store_graph(graph: Graph, key: str):
   graphs_bucket.put_object(Key=f"edges-{key}.json", Body=json.dumps(edges))
 
 def download_graph(country: str, city: str) -> Tuple[MultiDiGraph, str]:
-  G: MultiDiGraph = ox.graph_from_place(f"{city}, {country}", network_type="drive")
+  G: MultiDiGraph = ox.graph_from_place(
+    {
+      "city": city,
+      "country": country
+    },
+    network_type="drive"
+  )
   key: str = uuid4().hex
   #TODO: Send it directly to S3
+  ox.save_graphml(G, f"/tmp/{key}.graphml")
+  graphs_bucket.upload_file(f"/tmp/{key}.graphml", f"{key}.graphml")
+  return G, key
+
+def download_graph_by_distance(center, distance) -> Tuple[MultiDiGraph, str]:
+  G: MultiDiGraph = ox.graph_from_point(center, dist=distance)
+  key: str = uuid4().hex
   ox.save_graphml(G, f"/tmp/{key}.graphml")
   graphs_bucket.upload_file(f"/tmp/{key}.graphml", f"{key}.graphml")
   return G, key
@@ -118,35 +140,46 @@ def get_graph(country: str, city: str) -> Tuple[MultiDiGraph, str]:
 def get_node_id(graph: Union[MultiDiGraph, NGraph], location: Coordinates) -> NodeId:
   return ox.nearest_nodes(graph, location.longitude, location.latitude) # type: ignore
 
-def get_ids(country: str, city: str, source_coordinates: Coordinates, destination_coordinates: Coordinates) -> Tuple[str, NodeId, NodeId]:
-  graph_id = get_graph_id(country, city)
-  if graph_id is None:
-    G, graph_id = download_graph(country, city)
+def get_ids(country: str, city: str, source_coordinates: Coordinates, destination_coordinates: Coordinates, use_distance: Optional[float]) -> Tuple[str, NodeId, NodeId]:
+  if use_distance is None:
+    graph_id = get_graph_id(country, city)
+    if graph_id is None:
+      G, graph_id = download_graph(country, city)
+      graph: Graph = generate_graph(G)
+      store_graph(graph, graph_id)
+      graphs_table.put_item(Item={
+        "Country": country,
+        "City": city,
+        "GraphId": graph_id
+      })
+      source = get_node_id(G, source_coordinates)
+      destination = get_node_id(G, destination_coordinates)
+      return graph_id, source, destination
+    else:
+      try:
+        source_graph = ox.graph_from_point((source_coordinates.latitude, source_coordinates.longitude), dist=200, network_type="drive")
+        destination_graph = ox.graph_from_point((destination_coordinates.latitude, destination_coordinates.longitude), dist=200, network_type="drive")
+      except ValueError as err:
+        print("Not found a valid node around source or destination in 200m around.\n")
+        print(err)
+        raise
+      source = get_node_id(source_graph, source_coordinates)
+      destination = get_node_id(destination_graph, destination_coordinates)
+      return graph_id, source, destination
+  else:
+    latitude = (source_coordinates.latitude + destination_coordinates.longitude)/2
+    longitude = (source_coordinates.longitude + destination_coordinates.longitude)/2
+    G, graph_id = download_graph_by_distance((latitude, longitude), 2*1000*use_distance)
     graph: Graph = generate_graph(G)
     store_graph(graph, graph_id)
-    graphs_table.put_item(Item={
-      "Country": country,
-      "City": city,
-      "GraphId": graph_id
-    })
     source = get_node_id(G, source_coordinates)
     destination = get_node_id(G, destination_coordinates)
-    return graph_id, source, destination
-  else:
-    try:
-      source_graph = ox.graph_from_point((source_coordinates.latitude, source_coordinates.longitude), dist=200, network_type="drive")
-      destination_graph = ox.graph_from_point((destination_coordinates.latitude, destination_coordinates.longitude), dist=200, network_type="drive")
-    except ValueError as err:
-      print("Not found a valid node around source or destination in 200m around.\n")
-      print(err)
-      raise
-    source = get_node_id(source_graph, source_coordinates)
-    destination = get_node_id(destination_graph, destination_coordinates)
     return graph_id, source, destination
 
 def lambda_handler(event, _):
   source_coordinates = event["source"]
   destination_coordinates = event["destination"]
+  algorithm = event.get("algorithm", "dijkstra")
   source_coordinates = Coordinates(latitude=source_coordinates["latitude"], longitude=source_coordinates["longitude"])
   destination_coordinates = Coordinates(latitude=destination_coordinates["latitude"], longitude=destination_coordinates["longitude"])
 
@@ -160,17 +193,23 @@ def lambda_handler(event, _):
     print("No possible to find a valid location")
     return
 
+  use_distance = None
   if source_city != destination_city or source_country != destination_country:
     print("Source and destination are not in the same city/country")
-    return
+    use_distance = haversine(
+      (source_coordinates["longitude"], source_coordinates["latitude"]),
+      (destination_coordinates["longitude"], destination_coordinates["latitude"])
+    )
+    print("Not possible to cache, downloading by distance")
 
   ox.config(use_cache=True, cache_folder="/tmp/osmnx_cache")
-  graph_id, source, destination = get_ids(source_country, source_city, source_coordinates, destination_coordinates) #type: ignore
+  graph_id, source, destination = get_ids(source_country, source_city, source_coordinates, destination_coordinates, use_distance) #type: ignore
 
   return {
     "source": source,
     "destination": destination,
-    "key": graph_id
+    "key": graph_id,
+    "algorithm": algorithm
   }
 
 

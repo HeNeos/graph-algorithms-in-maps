@@ -4,6 +4,7 @@ import * as cdk from 'aws-cdk-lib';
 import { S3Stack } from '../lib/s3/s3Stack';
 import { DatabaseStack } from '../lib/database/dabaseStack';
 import { SfnStack } from '../lib/sfn/sfnStack';
+import { ApiStack } from '../lib/api/apiStack';
 
 const app = new cdk.App();
 const s3Stack = new S3Stack(app, "S3Stack");
@@ -12,6 +13,9 @@ const sfnStack = new SfnStack(app, "SfnStack", {
   graphsPlotsBucket: s3Stack.graphsPlotsBucket,
   graphsBucket: s3Stack.graphsBucket,
   graphsDatabase: databaseStack.graphsDatabase
+});
+const apiStack = new ApiStack(app, "ApiStack", {
+  graphsStateMachine: sfnStack.graphsStateMachine
 });
 
 app.synth();

@@ -39,7 +39,7 @@ def get_multidigraph(graph_id: str) -> MultiDiGraph:
 def get_path(solution_key: str):
   path_object = s3_client.get_object(
     Bucket=PATHS_BUCKET_NAME,
-    Key=solution_key
+    Key=f"{solution_key}.json"
   )
   path = json.load(path_object["Body"])
   return {int(k): v for k, v in path.items()}
@@ -111,7 +111,7 @@ def save_graph(graph: MultiDiGraph, edges_in_path: List[EdgeId], solution_key: s
     close=False
   )
   title = '\n'.join([f"Distance: {dist} km", f"Time: {time}"])
-  ax.set_title(title, color="white")
+  ax.set_title(title, color="white", fontsize=10)
   plt.savefig(f"/tmp/{solution_key}.png", dpi=600)
   plt.close()
   paths_bucket.upload_file(f"/tmp/{solution_key}.png", f"{solution_key}.png")

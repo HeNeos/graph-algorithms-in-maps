@@ -8,6 +8,8 @@ EdgeId = Tuple[NodeId, NodeId]
 class Node:
   id: NodeId
   next_nodes: List[NodeId]
+  lat: float
+  lon: float
 
 @dataclass
 class Edge:
