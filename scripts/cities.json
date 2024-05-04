@@ -1,0 +1,121 @@
+[
+  {
+    "country": "Germany",
+    "city": "Berlin",
+    "lat": "52.5170365",
+    "lon": "13.3888599",
+    "uploaded": true
+  },
+  {
+    "country": "Italy",
+    "city": "Rome",
+    "lat": "41.8933203",
+    "lon": "12.4829321",
+    "uploaded": true
+  },
+  {
+    "country": "France",
+    "city": "Paris",
+    "lat": "48.8588897",
+    "lon": "2.3200410217200766",
+    "uploaded": true
+  },
+  {
+    "country": "Spain",
+    "city": "Madrid",
+    "lat": "40.4167047",
+    "lon": "-3.7035825",
+    "uploaded": true
+  },
+  {
+    "country": "United Kingdom",
+    "city": "London",
+    "lat": "51.5074456",
+    "lon": "-0.1277653",
+    "uploaded": true
+  },
+  {
+    "country": "Japan",
+    "city": "Tokyo",
+    "lat": "35.6821936",
+    "lon": "139.762221",
+    "uploaded": true
+  },
+  {
+    "country": "China",
+    "city": "Beijing",
+    "lat": "39.9057136",
+    "lon": "116.3912972",
+    "uploaded": true
+  },
+  {
+    "country": "India",
+    "city": "New Delhi",
+    "lat": "28.6138954",
+    "lon": "77.2090057",
+    "uploaded": true
+  },
+  {
+    "country": "Canada",
+    "city": "Ottawa",
+    "lat": "45.4208777",
+    "lon": "-75.6901106",
+    "uploaded": true
+  },
+  {
+    "country": "Mexico",
+    "city": "Mexico City",
+    "lat": "19.4326296",
+    "lon": "-99.1331785",
+    "uploaded": true
+  },
+  {
+    "country": "Argentina",
+    "city": "Buenos Aires",
+    "lat": "-34.6037181",
+    "lon": "-58.38153",
+    "uploaded": true
+  },
+  {
+    "country": "Egypt",
+    "city": "Cairo",
+    "lat": "30.0443879",
+    "lon": "31.2357257",
+    "uploaded": true
+  },
+  {
+    "country": "United States",
+    "city": "New York City",
+    "lat": "40.7127281",
+    "lon": "-74.0060152",
+    "uploaded": true
+  },
+  {
+    "country": "United States",
+    "city": "Los Angeles",
+    "lat": "34.0536909",
+    "lon": "-118.242766",
+    "uploaded": true
+  },
+  {
+    "country": "Peru",
+    "city": "Lima",
+    "lat": "-12.0621065",
+    "lon": "-77.0365256",
+    "uploaded": true
+  },
+  {
+    "country": "Germany",
+    "city": "Hamburg",
+    "lat": "53.550341",
+    "lon": "10.000654",
+    "uploaded": true
+  },
+  {
+    "country": "Germany",
+    "city": "Rostock",
+    "lat": "54.0886707",
+    "lon": "12.1400211",
+    "uploaded": true
+  }
+]
