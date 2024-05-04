@@ -45,7 +45,7 @@ export class SfnStack extends cdk.Stack {
         PATHS_BUCKET: graphsPlotsBucket.bucketName,
         GRAPHS_TABLE_NAME: graphsDatabase.tableName
       },
-      timeout: cdk.Duration.minutes(6),
+      timeout: cdk.Duration.minutes(7),
       memorySize: 2048,
       ephemeralStorageSize: cdk.Size.mebibytes(1024)
     });
@@ -60,7 +60,7 @@ export class SfnStack extends cdk.Stack {
         PATHS_BUCKET: graphsPlotsBucket.bucketName,
         GRAPHS_TABLE_NAME: graphsDatabase.tableName
       },
-      timeout: cdk.Duration.minutes(2),
+      timeout: cdk.Duration.minutes(7),
       memorySize: 2048,
       ephemeralStorageSize: cdk.Size.mebibytes(1024)
     });

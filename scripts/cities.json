@@ -117,5 +117,11 @@
     "lat": "54.0886707",
     "lon": "12.1400211",
     "uploaded": true
+  },
+  {
+    "country": "Germany",
+    "city": "Munich",
+    "lat": "48.1371079",
+    "lon": "11.5753822"
   }
 ]
