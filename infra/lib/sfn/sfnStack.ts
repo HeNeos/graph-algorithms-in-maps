@@ -4,12 +4,10 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
 import { RustFunction } from 'cargo-lambda-cdk';
-import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as dynamo from 'aws-cdk-lib/aws-dynamodb';
 import * as path from 'path';
 import * as tasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
-import { LambdaAction } from 'aws-cdk-lib/aws-cloudwatch-actions';
 import * as logs from 'aws-cdk-lib/aws-logs';
 
 interface LambdaStackProps extends cdk.StackProps {
