@@ -46,16 +46,34 @@ pub async fn upload_path(
     bucket: &String,
     key: &str,
     graph_path: &HashMap<NodeId, NodeId>,
-) -> Result<PutObjectOutput, SdkError<PutObjectError>> {
+    visited_edges: &Vec<EdgeId>,
+    active_edges: &Vec<EdgeId>,
+) -> bool {
     let path_json: String =
         serde_json::to_string(&graph_path).expect("Failed to serialize the path");
-    client
-        .put_object()
-        .bucket(bucket)
-        .key(format!("{}.json", key))
-        .body(path_json.into_bytes().into())
-        .send()
-        .await
+    let visited_json: String =
+        serde_json::to_string(&visited_edges).expect("Failed to serialize the visited edges");
+    let active_json: String =
+        serde_json::to_string(&active_edges).expect("Failed to serialize the active edges");
+
+    let mut response: bool = true;
+    for (json_file, name) in [
+        (path_json, "path"),
+        (visited_json, "visited"),
+        (active_json, "active"),
+    ] {
+        let resp = client
+            .put_object()
+            .bucket(bucket)
+            .key(format!("{}-{}.json", &name, key))
+            .body(json_file.into_bytes().into())
+            .send()
+            .await;
+        assert!(resp.is_ok(), "{resp:?}");
+        response = response && resp.is_ok();
+    }
+
+    return response;
 }
 
 pub async fn parse_graph(nodes: &NodesJson, edges: &EdgesJson) -> Result<Graph, anyhow::Error> {

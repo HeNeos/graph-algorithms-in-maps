@@ -89,7 +89,7 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
         _ => dijkstra(&graph, source, destination).await,
     };
 
-    let (path, weight, iterations) = match graph_result {
+    let (path, visited_edges, active_edges, weight, iterations) = match graph_result {
         Some(x) => x,
         None => {
             eprintln!("Failed to find a path");
@@ -101,9 +101,19 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
     let unique_id: String = Uuid::new_v4().hyphenated().to_string();
     let file_key: String = format!("{}_{}", current_time, unique_id);
 
-    let resp = upload_path(&client, &solution_bucket, &file_key, &path).await;
+    let resp = upload_path(
+        &client,
+        &solution_bucket,
+        &file_key,
+        &path,
+        &visited_edges,
+        &active_edges,
+    )
+    .await;
 
-    assert!(resp.is_ok(), "{resp:?}");
+    if !resp {
+        eprint!("Failed to upload path");
+    }
 
     let resp: Response = Response {
         iterations,

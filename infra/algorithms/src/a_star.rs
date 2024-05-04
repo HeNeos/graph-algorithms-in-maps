@@ -8,11 +8,13 @@ pub async fn a_star(
     graph: &Graph,
     source: NodeId,
     destination: NodeId,
-) -> Option<(HashMap<NodeId, NodeId>, f64, i64)> {
-    let max_speed_allowed: f64 = 200.0;
+) -> Option<(HashMap<NodeId, NodeId>, Vec<EdgeId>, Vec<EdgeId>, f64, i64)> {
+    let max_speed_allowed: f64 = 150.0;
     let mut weight_from_source: HashMap<NodeId, f64> = HashMap::new();
     let mut visited_nodes: HashSet<NodeId> = HashSet::new();
     let mut previous_node: HashMap<NodeId, NodeId> = HashMap::new();
+    let mut visited_edges: Vec<EdgeId> = Vec::new();
+    let mut active_edges: HashSet<EdgeId> = HashSet::new();
 
     let mut iteration: i64 = 0;
     let mut priority_queue: BinaryHeap<State> = BinaryHeap::new();
@@ -20,9 +22,21 @@ pub async fn a_star(
         weight: 0.,
         node_id: source,
     });
-    while let Some(State { weight, node_id }) = priority_queue.pop() {
+    weight_from_source.insert(source, 0.0);
+    let destination_node = graph.nodes.get(&destination).unwrap().clone();
+    while let Some(State { weight: _, node_id }) = priority_queue.pop() {
+        let weight_to_node = weight_from_source
+            .get(&node_id)
+            .copied()
+            .unwrap_or(INFINITY);
         if node_id == destination {
-            return Some((previous_node, weight, iteration));
+            return Some((
+                previous_node,
+                visited_edges,
+                Vec::from_iter(active_edges),
+                weight_to_node,
+                iteration,
+            ));
         }
         let current_node: Node = graph.nodes.get(&node_id).unwrap().clone();
         if visited_nodes.contains(&node_id) {
@@ -35,16 +49,18 @@ pub async fn a_star(
             let next_node: Node = graph.nodes.get(&next_node_id).unwrap().clone();
             let current_edge_id: EdgeId = (node_id, *next_node_id);
             let current_edge: Edge = graph.edges.get(&current_edge_id).unwrap().clone();
+            visited_edges.push(current_edge_id);
+            active_edges.remove(&current_edge_id);
             let edge_weight: f64 = (current_edge.length / 1000.) / (current_edge.maxspeed as f64);
             let distance_by_nodes: f64 = find_distance_by_nodes(
                 current_node.lat,
                 current_node.lon,
-                next_node.lat,
-                next_node.lon,
+                destination_node.lat,
+                destination_node.lon,
             )
             .await;
             let heuristic_weight: f64 = distance_by_nodes / max_speed_allowed;
-            let new_weight: f64 = weight + edge_weight;
+            let new_weight: f64 = weight_to_node + edge_weight;
             if weight_from_source
                 .get(next_node_id)
                 .copied()
@@ -57,6 +73,11 @@ pub async fn a_star(
                     weight: new_weight + heuristic_weight,
                     node_id: *next_node_id,
                 });
+                let nodes_to_visit: Vec<NodeId> =
+                    graph.nodes.get(&next_node_id).unwrap().clone().next_nodes;
+                for to_visit_node_id in &nodes_to_visit {
+                    active_edges.insert((*next_node_id, *to_visit_node_id));
+                }
             }
         }
     }
