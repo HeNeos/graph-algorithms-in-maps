@@ -26,10 +26,12 @@ graphs_table = dynamodb.Table(GRAPHS_TABLE_NAME)
 s3 = boto3.resource("s3")
 graphs_bucket = s3.Bucket(GRAPHS_BUCKET_NAME)
 
+HEADERS = {"User-Agent": "GraphMapsApplication/1.0"}
+
 def get_current_location(coordinates: Coordinates) -> Tuple[Optional[str], Optional[str]]:
   latitude, longitude = (round(coordinates.latitude, 6), round(coordinates.longitude, 6))
   url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={latitude}&lon={longitude}"
-  response = requests.get(url)
+  response = requests.get(url, headers=HEADERS)
   data = response.json()
   if "address" not in data:
     return (None, None)
@@ -194,7 +196,12 @@ def lambda_handler(event, _):
 
   if not all([source_city, source_country, destination_city, destination_country]):
     print("No possible to find a valid location")
-    return
+    if source_city is None and destination_city is None:
+      return
+    if source_country is None and destination_country is None:
+      return
+    if source_country != destination_country:
+      return
 
   use_distance = None
   if source_city != destination_city or source_country != destination_country:

@@ -8,10 +8,10 @@ import requests
 
 from dataclasses import dataclass
 from networkx import MultiDiGraph
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Set
 
 from modules.graph import NodeId, EdgeId, Node, Edge, Graph
-from modules.plot import POINT_ALPHA, POINT_SIZE, NODE_ALPHA, NODE_SIZE, PathEdge, UnvisitedEdge
+from modules.plot import POINT_ALPHA, POINT_SIZE, NODE_ALPHA, NODE_SIZE, PathEdge, UnvisitedEdge, ActiveEdge, VisitedEdge
 
 GRAPHS_TABLE_NAME = os.environ["GRAPHS_TABLE_NAME"]
 GRAPHS_BUCKET_NAME = os.environ["GRAPHS_BUCKET"]
@@ -38,12 +38,14 @@ def get_multidigraph(graph_id: str) -> MultiDiGraph:
   return ox.load_graphml(f"/tmp/{graph_id}.graphml")
 
 def get_path(solution_key: str):
-  path_object = s3_client.get_object(
-    Bucket=PATHS_BUCKET_NAME,
-    Key=f"{solution_key}.json"
-  )
-  path = json.load(path_object["Body"])
-  return {int(k): v for k, v in path.items()}
+  objects = [s3_client.get_object(Bucket=PATHS_BUCKET_NAME, Key=f"{name}-{solution_key}.json") for name in ["path", "visited", "active"]]
+  dicts = [json.load(object["Body"]) for object in objects]
+  path, visited, active = dicts
+  path = {int(k): v for k, v in path.items()}
+  visited = {(k[0], k[1]) for k in visited}
+  active = {(k[0], k[1]) for k in active}
+  return path, visited, active
+
 
 def get_graph_data(graph_id: str):
   [nodes, edges] = [
@@ -68,9 +70,7 @@ def get_graph_data(graph_id: str):
 
   return graph_nodes, graph_edges
 
-def save_graph(graph: MultiDiGraph, edges_in_path: List[EdgeId], solution_key: str, dist, time) -> Optional[str]:
-  destination = edges_in_path[0][-1]
-  source = edges_in_path[-1][0]
+def save_graph(graph: MultiDiGraph, edges_in_path: Set[EdgeId], visited: Set[EdgeId], active: Set[EdgeId], source: NodeId, destination: NodeId, solution_key: str, dist, time) -> Optional[str]:
   node_size = []
   node_alpha = []
   node_color = []
@@ -94,6 +94,14 @@ def save_graph(graph: MultiDiGraph, edges_in_path: List[EdgeId], solution_key: s
       edge_color.append(PathEdge.color)
       edge_alpha.append(PathEdge.alpha)
       edge_linewidth.append(PathEdge.linewidth)
+    elif (edge[0], edge[1]) in visited:
+      edge_color.append(VisitedEdge.color)
+      edge_alpha.append(VisitedEdge.alpha)
+      edge_linewidth.append(VisitedEdge.linewidth)
+    elif (edge[0], edge[1]) in active:
+      edge_color.append(ActiveEdge.color)
+      edge_alpha.append(ActiveEdge.alpha)
+      edge_linewidth.append(ActiveEdge.linewidth)
     else:
       edge_color.append(UnvisitedEdge.color)
       edge_alpha.append(UnvisitedEdge.alpha)
@@ -123,17 +131,17 @@ def save_graph(graph: MultiDiGraph, edges_in_path: List[EdgeId], solution_key: s
   }, ExpiresIn=300)
   return str(response)
 
-def reconstruct_path(G: MultiDiGraph, nodes: List[NodeId], edges: Dict[EdgeId, Edge], source: NodeId, destination: NodeId, path: Dict[NodeId, Optional[NodeId]], solution_key: str) -> str:
+def reconstruct_path(G: MultiDiGraph, nodes: List[NodeId], edges: Dict[EdgeId, Edge], source: NodeId, destination: NodeId, path: Dict[NodeId, Optional[NodeId]], visited: Set[EdgeId], active: Set[EdgeId], solution_key: str) -> str:
   dist: float = 0
   time: float = 0
-  edges_in_path: List[EdgeId] = []
+  edges_in_path: Set[EdgeId] = set()
   current_node_id: NodeId = destination
   while current_node_id != source:
     previous_node_id: Optional[NodeId] = path.get(current_node_id, None)
     if previous_node_id is None:
       break
     current_edge_id: EdgeId = (previous_node_id, current_node_id)
-    edges_in_path.append(current_edge_id)
+    edges_in_path.add(current_edge_id)
     current_edge: Edge = edges[current_edge_id]
     current_length = current_edge.length
     current_maxspeed = current_edge.maxspeed
@@ -145,7 +153,7 @@ def reconstruct_path(G: MultiDiGraph, nodes: List[NodeId], edges: Dict[EdgeId, E
   print(f"Total dist = {dist} km")
   print(f"Total time = {formatted_time}")
   print(f"Speed average = {dist / time}")
-  s3_url = save_graph(G, edges_in_path, solution_key, dist, formatted_time)
+  s3_url = save_graph(G, edges_in_path, visited, active, source, destination, solution_key, dist, formatted_time)
   return s3_url
 
 def lambda_handler(event: Event, _):
@@ -158,10 +166,10 @@ def lambda_handler(event: Event, _):
     graph_id=event["graph_id"]
   )
   G: MultiDiGraph = get_multidigraph(event_graph.graph_id)
-  path = get_path(event_graph.solution_key)
+  path, visited, active = get_path(event_graph.solution_key)
   nodes, edges = get_graph_data(event_graph.graph_id)
 
-  s3_url = reconstruct_path(G, nodes, edges, event_graph.source, event_graph.destination, path, event_graph.solution_key)
+  s3_url = reconstruct_path(G, nodes, edges, event_graph.source, event_graph.destination, path, visited, active, event_graph.solution_key)
 
   return {
     "statusCode": 200,
