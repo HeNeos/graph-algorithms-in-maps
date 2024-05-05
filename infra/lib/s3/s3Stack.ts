@@ -8,7 +8,12 @@ export class S3Stack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    this.graphsPlotsBucket = new s3.Bucket(this, "graphsPlotsBucket");
+    this.graphsPlotsBucket = new s3.Bucket(this, "graphsPlotsBucket", {
+      lifecycleRules: [{
+        enabled: true,
+        expiration: cdk.Duration.days(5)
+      }]
+    });
     this.graphsBucket = new s3.Bucket(this, "graphsBucket");
   }
 }
