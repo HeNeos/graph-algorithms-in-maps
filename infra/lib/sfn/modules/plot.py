@@ -20,8 +20,8 @@ class PathEdge:
   alpha = 1.0
   linewidth = 0.7
 
-NODE_SIZE = 0.18
-NODE_ALPHA = 0.07
+NODE_SIZE = 0.20
+NODE_ALPHA = 0.08
 
-POINT_SIZE = 20
+POINT_SIZE = 18
 POINT_ALPHA = 1

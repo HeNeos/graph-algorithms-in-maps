@@ -3,8 +3,8 @@ import os
 import osmnx as ox
 import boto3
 import json
+import io
 import matplotlib.pyplot as plt
-import requests
 
 from dataclasses import dataclass
 from networkx import MultiDiGraph
@@ -35,6 +35,7 @@ class Event:
 
 def get_multidigraph(graph_id: str) -> MultiDiGraph:
   graphs_bucket.download_file(Key=f"{graph_id}.graphml", Filename=f"/tmp/{graph_id}.graphml")
+
   return ox.load_graphml(f"/tmp/{graph_id}.graphml")
 
 def get_path(solution_key: str):
@@ -120,10 +121,16 @@ def save_graph(graph: MultiDiGraph, edges_in_path: Set[EdgeId], visited: Set[Edg
     close=False
   )
   title = '\n'.join([f"Distance: {dist} km", f"Time: {time}"])
-  ax.set_title(title, color="white", fontsize=10)
-  plt.savefig(f"/tmp/{solution_key}.png", dpi=600)
+  ax.set_title(title, color="#3b528b", fontsize=10)
+
+  buffer = io.BytesIO()
+
+  plt.savefig(buffer, dpi=300, format="png")
   plt.close()
-  paths_bucket.upload_file(f"/tmp/{solution_key}.png", f"{solution_key}.png")
+
+  buffer.seek(0)
+  paths_bucket.put_object(Body=buffer, Key=f"{solution_key}.png", ContentType="image/png")
+  buffer.close()
 
   response = s3_client.generate_presigned_url("get_object", Params={
     "Bucket": PATHS_BUCKET_NAME,
