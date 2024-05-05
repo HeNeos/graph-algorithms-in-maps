@@ -107,8 +107,8 @@ export class SfnStack extends cdk.Stack {
     this.graphsStateMachine = new sfn.StateMachine(this, "graphsStateMachine", {
       definitionBody: sfn.DefinitionBody.fromChainable(stateMachineDefinition),
       timeout: cdk.Duration.minutes(15),
-      stateMachineName: "GraphsAlgorithmsStateMachine",
-      stateMachineType: sfn.StateMachineType.EXPRESS,
+      stateMachineName: "GraphsAlgorithms",
+      stateMachineType: sfn.StateMachineType.STANDARD,
       logs: {
         destination: logGroup,
         level: sfn.LogLevel.ALL,
