@@ -52,14 +52,14 @@ pub async fn a_star(
             visited_edges.push(current_edge_id);
             active_edges.remove(&current_edge_id);
             let edge_weight: f64 = (current_edge.length / 1000.) / (current_edge.maxspeed as f64);
-            let distance_by_nodes: f64 = find_distance_by_nodes(
-                current_node.lat,
-                current_node.lon,
+            let destination_distance: f64 = find_distance_by_nodes(
+                next_node.lat,
+                next_node.lon,
                 destination_node.lat,
                 destination_node.lon,
             )
             .await;
-            let heuristic_weight: f64 = distance_by_nodes / max_speed_allowed;
+            let heuristic_weight: f64 = destination_distance / max_speed_allowed;
             let new_weight: f64 = weight_to_node + edge_weight;
             if weight_from_source
                 .get(next_node_id)
