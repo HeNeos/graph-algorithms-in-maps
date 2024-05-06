@@ -1,12 +1,14 @@
 extern crate queues;
 
 mod a_star;
+mod a_star_enhanced;
 mod bfs;
 mod dijkstra;
 mod graph;
 mod utils;
 
 use a_star::a_star;
+use a_star_enhanced::a_star_enhanced;
 use bfs::bfs;
 use dijkstra::dijkstra;
 use graph::{Graph, NodeId};
@@ -84,6 +86,7 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
 
     let graph_result = match algorithm_name.as_str() {
         "a_star" => a_star(&graph, source, destination).await,
+        "a_star_enhanced" => a_star_enhanced(&graph, source, destination).await,
         "bfs" => bfs(&graph, source, destination).await,
         "dijkstra" => dijkstra(&graph, source, destination).await,
         _ => dijkstra(&graph, source, destination).await,
