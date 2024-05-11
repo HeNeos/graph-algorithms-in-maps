@@ -87,7 +87,9 @@ pub async fn a_star_enhanced(
                     level_max_distance = destination_distance;
                 }
                 if best_node_distance != INFINITY {
-                    if destination_distance > 2.0 * best_node_distance {
+                    if destination_distance * f64::min(1.0, (1.0 + best_node_distance).ln())
+                        > 2.0 * best_node_distance
+                    {
                         continue;
                     } else {
                         best_node_distance =
