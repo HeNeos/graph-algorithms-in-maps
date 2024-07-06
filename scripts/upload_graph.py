@@ -8,10 +8,10 @@ from pathlib import Path
 
 from typing import List, Dict, Tuple, Optional
 
-sys.path.append((Path.cwd() / ".." / "infra/lib/sfn").absolute().as_posix())
+sys.path.append((Path.cwd() / ".." / "infra/lib/sfnStack").absolute().as_posix())
 
-from modules.graph import Graph  # type: ignore
-from lambdas.getGraph.lambda_function import download_graph, store_graph, generate_graph  # type: ignore
+from modules.graph import Graph
+from lambdas.getGraph.lambda_function import download_graph, store_graph, generate_graph
 
 GRAPHS_TABLE_NAME = os.environ["GRAPHS_TABLE_NAME"]
 GRAPHS_BUCKET_NAME = os.environ["GRAPHS_BUCKET"]
@@ -29,17 +29,17 @@ HEADERS = {"User-Agent": "GraphMapsApplication/1.0"}
 def get_place(lat: str, lon: str) -> Tuple[Optional[str], Optional[str]]:
     url = f"{NOMINATIM_URL}&lat={lat}&lon={lon}"
     response = requests.get(url, headers=HEADERS)
-    data: Dict = response.json()
+    data: Dict[str, Dict[str, str]] = response.json()
     if "address" not in data:
         print("Not possible to get the address")
         return (None, None)
-    address: Dict = data["address"]
+    address: Dict[str, str] = data["address"]
     city = address.get("city", None)
     country = address.get("country", None)
     return (city, country)
 
 
-def main():
+def main() -> None:
     with open("cities.json", "r") as f:
         cities_data: List[Dict[str, str]] = json.load(f)
 

@@ -1,17 +1,16 @@
 #!/usr/bin/env node
-import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
-import { S3Stack } from '../lib/s3/s3Stack';
-import { DatabaseStack } from '../lib/database/dabaseStack';
-import { SfnStack } from '../lib/sfn/sfnStack';
-import { ApiStack } from '../lib/api/apiStack';
+import { StorageStack } from '../lib/storageStack/storageStack';
+import { DatabaseStack } from '../lib/databaseStack/dabaseStack';
+import { SfnStack } from '../lib/sfnStack/sfnStack';
+import { ApiStack } from '../lib/apiStack/apiStack';
 
 const app = new cdk.App();
-const s3Stack = new S3Stack(app, "S3Stack");
+const storageStack = new StorageStack(app, "StorageStack");
 const databaseStack = new DatabaseStack(app, "DatabaseStack");
 const sfnStack = new SfnStack(app, "SfnStack", {
-  graphsPlotsBucket: s3Stack.graphsPlotsBucket,
-  graphsBucket: s3Stack.graphsBucket,
+  graphsPlotsBucket: storageStack.graphsPlotsBucket,
+  graphsBucket: storageStack.graphsBucket,
   graphsDatabase: databaseStack.graphsDatabase
 });
 const apiStack = new ApiStack(app, "ApiStack", {

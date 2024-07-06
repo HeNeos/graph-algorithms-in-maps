@@ -1,3 +1,4 @@
+import math
 import os
 import json
 import boto3
@@ -8,8 +9,7 @@ from uuid import uuid4
 import osmnx as ox
 from networkx import MultiDiGraph
 from networkx import Graph as NGraph
-from typing import Tuple, Optional, Dict, List, Union
-from haversine import haversine
+from typing import Tuple, Optional, Dict, List, Union, cast
 
 from modules.graph import NodeId, EdgeId, Node, Edge, Graph
 
@@ -40,7 +40,7 @@ def get_current_location(
     )
     url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={latitude}&lon={longitude}"
     response = requests.get(url, headers=HEADERS)
-    data = response.json()
+    data: Dict[str, Dict[str, str]] = response.json()
     if "address" not in data:
         return (None, None)
     address = data["address"]
@@ -49,7 +49,9 @@ def get_current_location(
     return (city, country)
 
 
-def get_max_speed(edge, min_max_speed_allowed=30):
+def get_max_speed(
+    edge: Dict[str, List[str] | str | int], min_max_speed_allowed: int = 30
+) -> int:
     max_speed = min_max_speed_allowed
     if "maxspeed" in edge:
         max_speeds = edge["maxspeed"]
@@ -69,12 +71,12 @@ def get_max_speed(edge, min_max_speed_allowed=30):
 def generate_graph(graph: MultiDiGraph) -> Graph:
     all_edges: Dict[EdgeId, Edge] = dict()
     to_node_by_node: Dict[NodeId, List[NodeId]] = dict()
-    for edge in graph.edges:
+    for edge in cast(List[Tuple[NodeId, NodeId, float]], graph.edges):
         u, v, _ = edge
-        current_edge = graph.edges[edge]
+        current_edge: Dict[str, List[str] | str | int] = graph.edges[edge]  # type: ignore
         all_edges[(u, v)] = Edge(
             id=(u, v),
-            length=current_edge["length"],
+            length=cast(float, current_edge["length"]),
             maxspeed=get_max_speed(current_edge),
         )
         if u not in to_node_by_node:
@@ -87,19 +89,19 @@ def generate_graph(graph: MultiDiGraph) -> Graph:
             lat=graph.nodes[node]["y"],
             lon=graph.nodes[node]["x"],
         )
-        for node in graph.nodes
+        for node in cast(List[NodeId], graph.nodes)
     }
     return Graph(nodes=all_nodes, edges=all_edges)
 
 
-def store_graph(graph: Graph, key: str):
-    nodes = {
+def store_graph(graph: Graph, key: str) -> None:
+    nodes: Dict[str, Dict[str, str]] = {
         "Nodes": {
             str(node): f"{node_data.lat},{node_data.lon}"
             for node, node_data in graph.nodes.items()
         }
     }
-    edges = {
+    edges: Dict[str, Dict[str, str]] = {
         "Edges": {
             ",".join(str(x) for x in edge_id): ",".join(
                 [str(edge.length), str(edge.maxspeed)]
@@ -112,8 +114,9 @@ def store_graph(graph: Graph, key: str):
 
 
 def download_graph(country: str, city: str) -> Tuple[MultiDiGraph, str]:
-    G: MultiDiGraph = ox.graph_from_place(
-        {"city": city, "country": country}, network_type="drive"
+    G: MultiDiGraph = cast(
+        MultiDiGraph,
+        ox.graph_from_place({"city": city, "country": country}, network_type="drive"),
     )
     key: str = uuid4().hex
     # TODO: Send it directly to S3
@@ -122,8 +125,12 @@ def download_graph(country: str, city: str) -> Tuple[MultiDiGraph, str]:
     return G, key
 
 
-def download_graph_by_distance(center, distance) -> Tuple[MultiDiGraph, str]:
-    G: MultiDiGraph = ox.graph_from_point(center, dist=distance)
+def download_graph_by_distance(
+    center: Coordinates, distance: float
+) -> Tuple[MultiDiGraph, str]:
+    G: MultiDiGraph = ox.graph_from_point(
+        (center.latitude, center.longitude), dist=int(distance)
+    )
     key: str = uuid4().hex
     ox.save_graphml(G, f"/tmp/{key}.graphml")
     graphs_bucket.upload_file(f"/tmp/{key}.graphml", f"{key}.graphml")
@@ -140,8 +147,8 @@ def get_multidigraph(graph_id: str) -> MultiDiGraph:
 def get_graph_id(country: str, city: str) -> Optional[str]:
     response = graphs_table.get_item(Key={"Country": country, "City": city})
 
-    item: Dict[str, Dict[str, str]] = response.get("Item", {})
-    graph_id: Optional[str] = item.get("GraphId", None)  # type: ignore
+    item: Dict[str, str] = cast(Dict[str, str], response.get("Item", {}))
+    graph_id: Optional[str] = item.get("GraphId", None)
     return graph_id
 
 
@@ -155,13 +162,13 @@ def get_graph(country: str, city: str) -> Tuple[MultiDiGraph, str]:
             Item={"Country": country, "City": city, "GraphId": graph_id}
         )
     else:
-        G: MultiDiGraph = get_multidigraph(graph_id)
+        G = get_multidigraph(graph_id)
 
     return G, graph_id
 
 
 def get_node_id(graph: Union[MultiDiGraph, NGraph], location: Coordinates) -> NodeId:
-    return ox.nearest_nodes(graph, location.longitude, location.latitude)  # type: ignore
+    return cast(NodeId, ox.nearest_nodes(graph, location.longitude, location.latitude))  # type: ignore
 
 
 def get_ids(
@@ -213,27 +220,46 @@ def get_ids(
             source_coordinates.longitude + destination_coordinates.longitude
         ) / 2
         G, graph_id = download_graph_by_distance(
-            (latitude, longitude), 2 * 1000 * use_distance
+            Coordinates(latitude=latitude, longitude=longitude), 2 * 1000 * use_distance
         )
-        graph: Graph = generate_graph(G)
+        graph: Graph = generate_graph(G)  # type: ignore
         store_graph(graph, graph_id)
         source = get_node_id(G, source_coordinates)
         destination = get_node_id(G, destination_coordinates)
         return graph_id, source, destination
 
 
-def lambda_handler(event, _):
-    if "querystring" in event:
-        event = event.get("querystring", {})
+def haversine(source: Coordinates, destination: Coordinates) -> float:
+    earth_radius: float = 6371.0088
+    delta_lat: float = destination.latitude - source.latitude
+    delta_lon: float = destination.longitude - source.longitude
+    dist: float = pow(math.sin((delta_lat / 2)), 2) + math.cos(
+        source.latitude
+    ) * math.cos(destination.latitude) * pow(math.sin(delta_lon / 2), 2)
+    haversine_kernel: float = 2 * math.asin(math.sqrt(dist))
+    return earth_radius * haversine_kernel
+
+
+def lambda_handler(
+    raw_event: Dict[str, Dict[str, str] | str], _: Dict[str, str]
+) -> Optional[Dict[str, NodeId | EdgeId | str]]:
+    if "querystring" in raw_event:
+        event: Dict[str, str] = cast(Dict[str, str], raw_event["querystring"])
+    else:
+        event = cast(Dict[str, str], raw_event)
+
     algorithm = event.get("algorithm", "dijkstra")
-    for coordinate in ["source_lat", "source_lon", "dest_lat", "dest_lon"]:
-        event[coordinate] = float(event[coordinate])
+    event_coordinates: Dict[str, float] = {
+        coordinate: float(event[coordinate])
+        for coordinate in ["source_lat", "source_lon", "dest_lat", "dest_lon"]
+    }
 
     source_coordinates = Coordinates(
-        latitude=event["source_lat"], longitude=event["source_lon"]
+        latitude=event_coordinates["source_lat"],
+        longitude=event_coordinates["source_lon"],
     )
     destination_coordinates = Coordinates(
-        latitude=event["dest_lat"], longitude=event["dest_lon"]
+        latitude=event_coordinates["dest_lat"], longitude=event_coordinates["dest_lon"]
     )
 
     source_location = get_current_location(source_coordinates)
@@ -245,20 +271,26 @@ def lambda_handler(event, _):
     if not all([source_city, source_country, destination_city, destination_country]):
         print("No possible to find a valid location")
         if source_city is None and destination_city is None:
-            return
+            return None
         if source_country is None and destination_country is None:
-            return
+            return None
         if source_country != destination_country:
-            return
+            return None
 
-    use_distance = None
+    if source_city is None or source_country is None:
+        print("Invalid locations")
+        return None
+
+    use_distance: Optional[float]
     if source_city != destination_city or source_country != destination_country:
         print("Source and destination are not in the same city/country")
         use_distance = haversine(
-            (event["source_lon"], event["source_lat"]),
-            (event["dest_lon"], event["dest_lat"]),
+            source_coordinates,
+            destination_coordinates,
         )
         print("Not possible to cache, downloading by distance")
+    else:
+        use_distance = None
 
     ox.config(use_cache=True, cache_folder="/tmp/osmnx_cache")
     graph_id, source, destination = get_ids(
@@ -267,7 +299,7 @@ def lambda_handler(event, _):
         source_coordinates,
         destination_coordinates,
         use_distance,
-    )  # type: ignore
+    )
 
     return {
         "source": source,

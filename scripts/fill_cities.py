@@ -2,12 +2,12 @@ import json
 import requests
 import time
 
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 
 
-def get_lat_lon(city, country):
+def get_lat_lon(city: str, country: str) -> Optional[Dict[str, str]]:
     """
     Fetches latitude and longitude for a city using Nominatim API.
 
@@ -25,7 +25,7 @@ def get_lat_lon(city, country):
     response = requests.get(NOMINATIM_URL, params=params, headers=headers)
 
     if response.status_code == 200:
-        data = response.json()
+        data: Optional[List[Dict[str, str]]] = response.json()
         if data:
             return {"lat": data[0]["lat"], "lon": data[0]["lon"]}
         else:
@@ -35,7 +35,7 @@ def get_lat_lon(city, country):
     return None
 
 
-def main():
+def main() -> None:
     with open("cities.json", "r") as f:
         cities_data: List[Dict[str, str]] = json.load(f)
 
