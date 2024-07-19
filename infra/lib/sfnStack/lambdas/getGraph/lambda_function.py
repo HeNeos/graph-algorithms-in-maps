@@ -12,6 +12,7 @@ from networkx import Graph as NGraph
 from typing import Tuple, Optional, Dict, List, Union, cast
 
 from modules.graph import NodeId, EdgeId, Node, Edge, Graph
+from modules.event import Event, EventQueryString, EventCoords, EventAddress, Algorithms
 
 
 @dataclass
@@ -47,6 +48,18 @@ def get_current_location(
     city: Optional[str] = address.get("city", None)
     country: Optional[str] = address.get("country", None)
     return (city, country)
+
+
+def get_lat_lon(address: str) -> Optional[Coordinates]:
+    url = "https://nominatim.openstreetmap.org/search"
+    params: Dict[str, str | int] = {"q": address, "format": "json", "limit": 1}
+    response = requests.get(url, params=params, headers=HEADERS)
+    if response.status_code == 200 and response.json():
+        location = response.json()[0]
+        return Coordinates(
+            latitude=float(location["lat"]), longitude=float(location["lon"])
+        )
+    return None
 
 
 def get_max_speed(
@@ -241,25 +254,40 @@ def haversine(source: Coordinates, destination: Coordinates) -> float:
 
 
 def lambda_handler(
-    raw_event: Dict[str, Dict[str, str] | str], _: Dict[str, str]
+    raw_event: Event, _: Dict[str, str]
 ) -> Optional[Dict[str, NodeId | EdgeId | str]]:
     if "querystring" in raw_event:
-        event: Dict[str, str] = cast(Dict[str, str], raw_event["querystring"])
+        raw_event = cast(EventQueryString, raw_event)
+        event: EventCoords | EventAddress = raw_event["querystring"]  # type: ignore
     else:
-        event = cast(Dict[str, str], raw_event)
+        event = cast(EventCoords | EventAddress, raw_event)
 
-    algorithm = event.get("algorithm", "dijkstra")
-    event_coordinates: Dict[str, float] = {
-        coordinate: float(event[coordinate])
-        for coordinate in ["source_lat", "source_lon", "dest_lat", "dest_lon"]
-    }
+    algorithm: Algorithms = event.get("algorithm") or "dijkstra"
+    if "source" in event and "dest" in event:
+        event_with_address = cast(EventAddress, event)
+        source_coordinates = get_lat_lon(event_with_address["source"])  # type: ignore
+        dest_coordinates = get_lat_lon(event_with_address["dest"])  # type: ignore
+        if source_coordinates is None or dest_coordinates is None:
+            print("Not able to find the address for you source or dest")
+            return None
+        else:
+            event_with_coords = EventCoords(
+                algorithm=algorithm,
+                source_lat=str(source_coordinates.latitude),
+                source_lon=str(source_coordinates.longitude),
+                dest_lat=str(dest_coordinates.latitude),
+                dest_lon=str(dest_coordinates.longitude),
+            )
+    else:
+        event_with_coords = cast(EventCoords, event)
 
     source_coordinates = Coordinates(
-        latitude=event_coordinates["source_lat"],
-        longitude=event_coordinates["source_lon"],
+        latitude=float(event_with_coords["source_lat"]),  # type: ignore
+        longitude=float(event_with_coords["source_lon"]),  # type: ignore
     )
     destination_coordinates = Coordinates(
-        latitude=event_coordinates["dest_lat"], longitude=event_coordinates["dest_lon"]
+        latitude=float(event_with_coords["dest_lat"]),  # type: ignore
+        longitude=float(event_with_coords["dest_lon"]),  # type: ignore
     )
 
     source_location = get_current_location(source_coordinates)
