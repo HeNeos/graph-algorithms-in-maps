@@ -10,10 +10,8 @@ interface ApiStackProps extends cdk.StackProps {
 }
 
 export class ApiStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: ApiStackProps) {
+  constructor(scope: Construct, id: string, props: ApiStackProps) {
     super(scope, id, props);
-
-    if (!props) throw new Error("Missing props");
 
     // const graphsRestApi = new apigw.StepFunctionsRestApi(this, "graphsRestApi", {
     //   stateMachine: props.graphsStateMachine,
@@ -25,7 +23,7 @@ export class ApiStack extends cdk.Stack {
     // }));
 
     const graphsLambdaUrl = new python.PythonFunction(this, "graphsLambdaUrl", {
-      runtime: lambda.Runtime.PYTHON_3_10,
+      runtime: lambda.Runtime.PYTHON_3_11,
       handler: "lambda_handler",
       timeout: cdk.Duration.minutes(5),
       entry: path.join(__dirname, "lambdas"),

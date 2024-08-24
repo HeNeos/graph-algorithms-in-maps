@@ -11,22 +11,19 @@ import * as tasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
 import * as logs from 'aws-cdk-lib/aws-logs';
 
 interface LambdaStackProps extends cdk.StackProps {
-  graphsPlotsBucket?: s3.Bucket;
-  graphsBucket?: s3.Bucket;
-  graphsDatabase?: dynamo.Table;
+  graphsPlotsBucket: s3.Bucket;
+  graphsBucket: s3.Bucket;
+  graphsDatabase: dynamo.Table;
 }
 
 export class SfnStack extends cdk.Stack {
   public readonly graphsStateMachine: sfn.StateMachine;
-  constructor(scope: Construct, id: string, props?: LambdaStackProps) {
+  constructor(scope: Construct, id: string, props: LambdaStackProps) {
     super(scope, id, props);
 
-    const graphsPlotsBucket = props?.graphsPlotsBucket;
-    const graphsBucket = props?.graphsBucket;
-    const graphsDatabase = props?.graphsDatabase;
-
-    if (!graphsBucket || !graphsPlotsBucket) throw new Error("Missing bucket props");
-    if (!graphsDatabase) throw new Error("Missing database prop");
+    const graphsPlotsBucket = props.graphsPlotsBucket;
+    const graphsBucket = props.graphsBucket;
+    const graphsDatabase = props.graphsDatabase;
 
     const getGraphsImage = lambda.DockerImageCode.fromImageAsset(__dirname, {
       buildArgs: {FUNCTION_NAME: "getGraph"},
